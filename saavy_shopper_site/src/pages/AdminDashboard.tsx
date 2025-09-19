@@ -15,6 +15,7 @@ const AdminDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [submissions, setSubmissions] = useState([]);
+  const [allPosts, setAllPosts] = useState([]); // New state for all published posts
   const [newPostTitle, setNewPostTitle] = useState('');
   const [newPostCategory, setNewPostCategory] = useState('');
   const [newPostContent, setNewPostContent] = useState('');
@@ -24,7 +25,7 @@ const AdminDashboard = () => {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [editingSubmission, setEditingSubmission] = useState(null);
-  const [editingReadTime, setEditingReadTime] = useState(''); // New state for editing read time
+  const [editingReadTime, setEditingReadTime] = useState('');
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -55,15 +56,33 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchAllPosts = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'blog_posts'));
+      const fetchedPosts = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setAllPosts(fetchedPosts);
+    } catch (e) {
+      console.error('Error fetching all posts: ', e);
+      toast({
+        title: "Error",
+        description: "Failed to load all posts. Check console for details.",
+        variant: "destructive"
+      });
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchSubmissions();
+      fetchAllPosts();
     }
   }, [isAuthenticated]);
 
   const handleApprove = async (submission) => {
     try {
-      // Calculate read time from submission content
       const readTime = `${Math.ceil(submission.content.split(' ').length / 200)} min read`;
 
       await addDoc(collection(db, 'blog_posts'), {
@@ -76,7 +95,7 @@ const AdminDashboard = () => {
         image: submission.image || '',
         status: 'published',
         createdAt: serverTimestamp(),
-        readTime: readTime, // Use calculated read time
+        readTime: readTime,
       });
 
       const submissionRef = doc(db, 'submissions', submission.id);
@@ -90,6 +109,7 @@ const AdminDashboard = () => {
       });
 
       fetchSubmissions();
+      fetchAllPosts();
     } catch (e) {
       console.error('Error approving submission: ', e);
       toast({
@@ -121,6 +141,27 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDeletePost = async (postId) => {
+    try {
+      const postRef = doc(db, 'blog_posts', postId);
+      await deleteDoc(postRef);
+
+      toast({
+        title: "Post Deleted",
+        description: "The published article has been permanently deleted.",
+      });
+
+      fetchAllPosts();
+    } catch (e) {
+      console.error('Error deleting post: ', e);
+      toast({
+        title: "Error",
+        description: "Failed to delete article. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleAddPost = async (e) => {
     e.preventDefault();
     setMessage('');
@@ -133,7 +174,6 @@ const AdminDashboard = () => {
     setLoading(true);
 
     try {
-      // Calculate read time based on the new post content
       const readTime = `${Math.ceil(newPostContent.split(' ').length / 200)} min read`;
 
       await addDoc(collection(db, 'blog_posts'), {
@@ -146,7 +186,7 @@ const AdminDashboard = () => {
         status: 'published',
         createdAt: serverTimestamp(),
         excerpt: newPostContent.substring(0, 150) + '...',
-        readTime: readTime, // Use calculated read time
+        readTime: readTime,
       });
       
       setMessage('New post added successfully!');
@@ -156,6 +196,7 @@ const AdminDashboard = () => {
       setNewPostAuthorName('');
       setNewPostAuthorBio('');
       setNewPostImage('');
+      fetchAllPosts();
     } catch (e) {
       console.error('Error adding document: ', e);
       setMessage('Error adding post. Please try again.');
@@ -176,7 +217,8 @@ const AdminDashboard = () => {
     setLoading(true);
 
     try {
-      await addDoc(collection(db, 'blog_posts'), {
+      const isNewSubmission = editingSubmission.status === 'pending';
+      const docRef = isNewSubmission ? await addDoc(collection(db, 'blog_posts'), {
         title: editingSubmission.title,
         content: editingSubmission.content,
         category: editingSubmission.category,
@@ -186,16 +228,32 @@ const AdminDashboard = () => {
         status: 'published',
         createdAt: serverTimestamp(),
         excerpt: editingSubmission.summary,
-        readTime: editingReadTime, // Use the manually edited read time
-      });
-      
-      const submissionRef = doc(db, 'submissions', editingSubmission.id);
-      await updateDoc(submissionRef, { status: 'approved' });
+        readTime: editingReadTime,
+      }) : doc(db, 'blog_posts', editingSubmission.id);
+
+      if (!isNewSubmission) {
+        await updateDoc(docRef, {
+            title: editingSubmission.title,
+            content: editingSubmission.content,
+            category: editingSubmission.category,
+            author: editingSubmission.authorName,
+            authorBio: editingSubmission.authorBio,
+            image: editingSubmission.image || '',
+            excerpt: editingSubmission.summary,
+            readTime: editingReadTime,
+        });
+      }
+
+      if (isNewSubmission) {
+          const submissionRef = doc(db, 'submissions', editingSubmission.id);
+          await updateDoc(submissionRef, { status: 'approved' });
+      }
 
       setMessage('Post edited and published successfully!');
       setEditingSubmission(null);
-      setEditingReadTime(''); // Reset the read time state
+      setEditingReadTime('');
       fetchSubmissions();
+      fetchAllPosts();
     } catch (e) {
       console.error('Error publishing edited document: ', e);
       setMessage('Error publishing edited post. Please try again.');
@@ -338,6 +396,7 @@ const AdminDashboard = () => {
         </Link>
         <h1 className="text-4xl font-bold mb-8">CMS Dashboard</h1>
         
+        {/* New Post Form */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Create a New Post</CardTitle>
@@ -419,6 +478,7 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Pending Submissions */}
         <Card>
           <CardHeader>
             <CardTitle>Pending Submissions ({submissions.length})</CardTitle>
@@ -451,6 +511,38 @@ const AdminDashboard = () => {
               </div>
             ) : (
               <p className="text-muted-foreground">No new submissions at this time.</p>
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* All Published Posts */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle>All Published Posts ({allPosts.length})</CardTitle>
+            <CardDescription>View, edit, or delete all live articles on the blog.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {allPosts.length > 0 ? (
+              <div className="space-y-4">
+                {allPosts.map(post => (
+                  <div key={post.id} className="border p-4 rounded-lg">
+                    <h3 className="font-bold text-lg">{post.title}</h3>
+                    <p className="text-muted-foreground text-sm">By: {post.author}</p>
+                    <div className="flex space-x-2 mt-4">
+                      <Button onClick={() => handleEdit(post)} variant="secondary">
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button onClick={() => handleDeletePost(post.id)} variant="destructive">
+                        <X className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No published posts found.</p>
             )}
           </CardContent>
         </Card>
