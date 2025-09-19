@@ -11,6 +11,7 @@ import AllPosts from "./pages/AllPosts";
 // import NotFound from "./pages/NotFound";
 import SubmissionGuidelines from "./pages/SubmissionGuidelines";
 import SubmitArticle from "./pages/SubmitArticle";
+    import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/submit" element={<SubmitArticle />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           {/* <Route path="*" element={<NotFound />} /> */}
+          <Route path="/admin" element={<AdminDashboard />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
