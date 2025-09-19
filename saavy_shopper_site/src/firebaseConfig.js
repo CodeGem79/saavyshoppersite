@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, where, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, where, updateDoc, doc, deleteDoc, getDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage'; // NEW: Imports for Firebase Storage
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -14,6 +15,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const storage = getStorage(app); // NEW: Initialize Firebase Storage
 
-// Export the database instance and other functions
-export { db, collection, getDocs, addDoc, serverTimestamp, query, where, updateDoc, doc, deleteDoc };
+// Export the database instance, storage, and other functions
+export { db, collection, getDocs, addDoc, serverTimestamp, query, where, updateDoc, doc, deleteDoc, getDoc, storage, ref, uploadBytes, getDownloadURL };

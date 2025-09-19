@@ -10,6 +10,9 @@ import { ArrowLeft, Send, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import Footer from "../components/footer";
+// Import the necessary Firebase functions for adding documents
+import { db, collection, addDoc, serverTimestamp } from '../firebaseConfig';
+
 
 const SubmitArticle = () => {
   const { toast } = useToast();
@@ -31,13 +34,19 @@ const SubmitArticle = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate submission
-    setTimeout(() => {
+    try {
+      // Add a document to the 'submissions' collection
+      await addDoc(collection(db, 'submissions'), {
+        ...formData,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+      
       toast({
         title: "Article Submitted Successfully!",
         description: "We'll review your submission and get back to you within 5-7 business days.",
       });
-      setIsSubmitting(false);
+
       // Reset form
       setFormData({
         title: "",
@@ -51,7 +60,16 @@ const SubmitArticle = () => {
         agreeTerms: false,
         allowEditing: false
       });
-    }, 2000);
+    } catch (error) {
+      console.error("Error adding document: ", error);
+      toast({
+        title: "Error",
+        description: "There was an error submitting your article. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string | boolean) => {

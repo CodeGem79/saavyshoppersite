@@ -4,77 +4,69 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Calendar, Clock, ArrowRight, ArrowLeft, Search, Filter } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useState, useMemo } from "react";
-import blogSmartShopping from "../assets/logo.jpg";
-import blogCoupons from "../assets/logo.jpg";
-import blogBudget from "../assets/logo.jpg";
-
-const allBlogPosts = [
-  {
-    id: 1,
-    title: "10 Smart Shopping Tricks That Will Cut Your Bills in Half",
-    excerpt: "Discover the insider secrets that professional shoppers use to save thousands every year. From timing your purchases to leveraging technology.",
-    image: blogSmartShopping,
-    readTime: "5 min read",
-    date: "Mar 15, 2024",
-    category: "Shopping Tips"
-  },
-  {
-    id: 2,
-    title: "The Ultimate Guide to Couponing in 2024",
-    excerpt: "Master the art of couponing with our comprehensive guide. Learn how to stack deals, find hidden discounts, and maximize your savings.",
-    image: blogCoupons,
-    readTime: "8 min read", 
-    date: "Mar 12, 2024",
-    category: "Coupons"
-  },
-  {
-    id: 3,
-    title: "Creating a Monthly Budget That Actually Works",
-    excerpt: "Stop struggling with budgets that fail. Our proven method helps you create a realistic budget that you'll actually stick to long-term.",
-    image: blogBudget,
-    readTime: "6 min read",
-    date: "Mar 10, 2024",
-    category: "Budgeting"
-  },
-  {
-    id: 4,
-    title: "Cashback Apps: The Complete Beginner's Guide",
-    excerpt: "Learn how to earn money back on every purchase with the best cashback apps and strategies that actually work in 2024.",
-    image: blogSmartShopping,
-    readTime: "7 min read",
-    date: "Mar 8, 2024",
-    category: "Apps & Technology"
-  },
-  {
-    id: 5,
-    title: "Price Comparison: How to Never Overpay Again",
-    excerpt: "Master the art of price comparison with tools and techniques that ensure you always get the best deal on any purchase.",
-    image: blogCoupons,
-    readTime: "6 min read",
-    date: "Mar 5, 2024",
-    category: "Shopping Tips"
-  },
-  {
-    id: 6,
-    title: "Emergency Fund: Build Yours in 6 Months",
-    excerpt: "Step-by-step guide to building an emergency fund that protects your finances and gives you peace of mind.",
-    image: blogBudget,
-    readTime: "9 min read",
-    date: "Mar 3, 2024",
-    category: "Budgeting"
-  }
-];
+import { useState, useMemo, useEffect } from "react";
+// We import the necessary Firebase functions to interact with Firestore.
+import { db, collection, getDocs, query, where, orderBy, limit } from '../firebaseConfig';
+import Footer from "../components/footer";
 
 const POSTS_PER_PAGE = 6;
 
+// I've added some hard-coded images and a map for now. A more robust solution might involve storing the image URL in Firestore.
+const imageMap = {
+  "Shopping Tips": "/src/assets/shopping_cart.jpg",
+  "Coupons": "/src/assets/logo.jpg",
+  "Budgeting": "/src/assets/shopping_cart.jpg",
+  "Apps & Technology": "/src/assets/logo.jpg",
+};
+
 const AllPosts = () => {
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  // We initialize the state to an empty array to hold our posts.
+  const [allBlogPosts, setAllBlogPosts] = useState([]);
+  // We use a loading state to show a message while data is being fetched.
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   
-  const categories = ["all", ...Array.from(new Set(allBlogPosts.map(post => post.category)))];
+  // This asynchronous function fetches posts from Firestore.
+  const fetchPosts = async () => {
+    setLoading(true);
+    try {
+      // Create a query to get all documents from the "blog_posts" collection.
+      const querySnapshot = await getDocs(collection(db, "blog_posts"));
+      // Map over the documents to format the data.
+      const fetchedPosts = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        // Get the image from our hard-coded map based on the post's category.
+        image: imageMap[doc.data().category] || '/src/assets/logo.jpg',
+        // Convert the Firestore timestamp to a readable date string.
+        date: new Date(doc.data().createdAt.seconds * 1000).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+      }));
+      setAllBlogPosts(fetchedPosts);
+    } catch (error) {
+      console.error("Error fetching documents: ", error);
+    }
+    setLoading(false);
+  };
 
+  // The useEffect hook calls fetchPosts once when the component is first rendered.
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  // useMemo is used to prevent unnecessary recalculations of categories.
+  const categories = useMemo(() => {
+    const uniqueCategories = new Set(allBlogPosts.map(post => post.category));
+    return ["all", ...Array.from(uniqueCategories)];
+  }, [allBlogPosts]);
+
+  // useMemo is used to filter posts based on search and category without re-rendering unnecessarily.
   const filteredPosts = useMemo(() => {
     return allBlogPosts.filter(post => {
       const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -83,7 +75,7 @@ const AllPosts = () => {
       const matchesCategory = selectedCategory === "all" || post.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [searchTerm, selectedCategory]);
+  }, [searchTerm, selectedCategory, allBlogPosts]);
   
   const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
   const startIndex = (currentPage - 1) * POSTS_PER_PAGE;
@@ -92,7 +84,7 @@ const AllPosts = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* Header code... */}
       <div className="bg-gradient-to-r from-primary/5 via-primary/10 to-secondary/5 pt-20 pb-16">
         <div className="container mx-auto px-6">
           <div className="text-center">
@@ -109,10 +101,7 @@ const AllPosts = () => {
           </div>
         </div>
       </div>
-
-      {/* Blog Posts Grid */}
       <div className="container mx-auto px-6 py-16">
-        {/* Search and Filter */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -140,7 +129,6 @@ const AllPosts = () => {
           </div>
         </div>
 
-        {/* Results Count */}
         <div className="mb-6">
           <p className="text-muted-foreground">
             Showing {filteredPosts.length} of {allBlogPosts.length} posts
@@ -148,78 +136,82 @@ const AllPosts = () => {
             {selectedCategory !== "all" && ` in ${selectedCategory}`}
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-          {currentPosts.length > 0 ? (
-            currentPosts.map((post, index) => (
-              <Card 
-                key={post.id} 
-                className="overflow-hidden hover-lift shadow-card border-0 animate-scale-in"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <div className="relative overflow-hidden">
-                  <img 
-                    src={post.image} 
-                    alt={post.title}
-                    className="w-full h-48 object-cover transition-transform duration-300 hover:scale-110"
-                  />
-                  <div className="absolute top-4 left-4">
-                    <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-medium">
-                      {post.category}
-                    </span>
-                  </div>
-                </div>
-                
-                <CardHeader>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-4 w-4" />
-                      {post.date}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      {post.readTime}
+        
+        {loading ? (
+          <div className="col-span-full text-center py-12 text-muted-foreground">Loading posts...</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+            {currentPosts.length > 0 ? (
+              currentPosts.map((post, index) => (
+                <Card 
+                  key={post.id} 
+                  className="overflow-hidden hover-lift shadow-card border-0 animate-scale-in"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <div className="relative overflow-hidden">
+                    <img 
+                      src={post.image} 
+                      alt={post.title}
+                      className="w-full h-48 object-cover transition-transform duration-300 hover:scale-110"
+                    />
+                    <div className="absolute top-4 left-4">
+                      <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-medium">
+                        {post.category}
+                      </span>
                     </div>
                   </div>
-                  <Link to={`/blog/${post.id}`}>
-                    <CardTitle className="text-xl hover:text-primary transition-colors cursor-pointer">
-                      {post.title}
-                    </CardTitle>
-                  </Link>
-                </CardHeader>
-                
-                <CardContent>
-                  <p className="text-muted-foreground mb-4 line-clamp-3">
-                    {post.excerpt}
-                  </p>
-                  <Link to={`/blog/${post.id}`}>
-                    <Button variant="ghost" className="group p-0 h-auto font-medium">
-                      Read More 
-                      <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <div className="col-span-full text-center py-12">
-              <p className="text-muted-foreground text-lg mb-4">
-                No posts found matching your search criteria.
-              </p>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setSearchTerm("");
-                  setSelectedCategory("all");
-                  setCurrentPage(1);
-                }}
-              >
-                Clear Filters
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Pagination */}
+                  
+                  <CardHeader>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        {post.date}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        {post.readTime}
+                      </div>
+                    </div>
+                    <Link to={`/blog/${post.id}`}>
+                      <CardTitle className="text-xl hover:text-primary transition-colors cursor-pointer">
+                        {post.title}
+                      </CardTitle>
+                    </Link>
+                  </CardHeader>
+                  
+                  <CardContent>
+                    <p className="text-muted-foreground mb-4 line-clamp-3">
+                      {post.excerpt}
+                    </p>
+                    <Link to={`/blog/${post.id}`}>
+                      <Button variant="ghost" className="group p-0 h-auto font-medium">
+                        Read More 
+                        <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="col-span-full text-center py-12">
+                <p className="text-muted-foreground text-lg mb-4">
+                  No posts found matching your search criteria.
+                </p>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedCategory("all");
+                    setCurrentPage(1);
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+        
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-4">
             <Button 
@@ -256,6 +248,7 @@ const AllPosts = () => {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 };

@@ -5,21 +5,26 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../co
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
-// import { useToast } from "../components/ui/use-toast";
-import { Check, X, ArrowLeft } from "lucide-react";
+import { Check, X, ArrowLeft, Pencil } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 
-const ADMIN_PASSWORD = 'Password'; // <--- CHANGE THIS TO A SECURE PASSWORD
+const ADMIN_PASSWORD = 'Password';
 
 const AdminDashboard = () => {
-//   const { toast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [submissions, setSubmissions] = useState([]);
   const [newPostTitle, setNewPostTitle] = useState('');
   const [newPostCategory, setNewPostCategory] = useState('');
   const [newPostContent, setNewPostContent] = useState('');
+  const [newPostAuthorName, setNewPostAuthorName] = useState('');
+  const [newPostAuthorBio, setNewPostAuthorBio] = useState('');
+  const [newPostImage, setNewPostImage] = useState('');
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [editingSubmission, setEditingSubmission] = useState(null);
+  const [editingReadTime, setEditingReadTime] = useState(''); // New state for editing read time
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -58,18 +63,22 @@ const AdminDashboard = () => {
 
   const handleApprove = async (submission) => {
     try {
-      // Add the submission to the main blog posts collection
+      // Calculate read time from submission content
+      const readTime = `${Math.ceil(submission.content.split(' ').length / 200)} min read`;
+
       await addDoc(collection(db, 'blog_posts'), {
         title: submission.title,
         content: submission.content,
         author: submission.authorName,
         category: submission.category,
-        image: submission.image || '', // Add an image field if needed
+        excerpt: submission.summary,
+        authorBio: submission.authorBio,
+        image: submission.image || '',
         status: 'published',
         createdAt: serverTimestamp(),
+        readTime: readTime, // Use calculated read time
       });
 
-      // Update the status of the original submission to 'approved'
       const submissionRef = doc(db, 'submissions', submission.id);
       await updateDoc(submissionRef, {
         status: 'approved',
@@ -80,7 +89,6 @@ const AdminDashboard = () => {
         description: "Article approved and published to the blog.",
       });
 
-      // Refresh the submissions list
       fetchSubmissions();
     } catch (e) {
       console.error('Error approving submission: ', e);
@@ -94,7 +102,6 @@ const AdminDashboard = () => {
 
   const handleReject = async (submissionId) => {
     try {
-      // Delete the submission from the database
       const submissionRef = doc(db, 'submissions', submissionId);
       await deleteDoc(submissionRef);
 
@@ -103,7 +110,6 @@ const AdminDashboard = () => {
         description: "Submission has been permanently deleted.",
       });
 
-      // Refresh the submissions list
       fetchSubmissions();
     } catch (e) {
       console.error('Error rejecting submission: ', e);
@@ -119,30 +125,89 @@ const AdminDashboard = () => {
     e.preventDefault();
     setMessage('');
     
-    if (!newPostTitle || !newPostContent || !newPostCategory) {
-      setMessage('Title, category, and content are required!');
+    if (!newPostTitle || !newPostContent || !newPostCategory || !newPostAuthorName) {
+      setMessage('Title, category, content, and author name are required!');
       return;
     }
 
+    setLoading(true);
+
     try {
+      // Calculate read time based on the new post content
+      const readTime = `${Math.ceil(newPostContent.split(' ').length / 200)} min read`;
+
       await addDoc(collection(db, 'blog_posts'), {
         title: newPostTitle,
         content: newPostContent,
         category: newPostCategory,
-        author: 'Admin',
+        author: newPostAuthorName,
+        authorBio: newPostAuthorBio,
+        image: newPostImage,
         status: 'published',
         createdAt: serverTimestamp(),
+        excerpt: newPostContent.substring(0, 150) + '...',
+        readTime: readTime, // Use calculated read time
       });
+      
       setMessage('New post added successfully!');
       setNewPostTitle('');
       setNewPostContent('');
       setNewPostCategory('');
+      setNewPostAuthorName('');
+      setNewPostAuthorBio('');
+      setNewPostImage('');
     } catch (e) {
       console.error('Error adding document: ', e);
       setMessage('Error adding post. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
   
+  const handleEdit = (submission) => {
+    setEditingSubmission(submission);
+    setEditingReadTime(submission.readTime || '');
+  };
+  
+  const handlePublishEdit = async (e) => {
+    e.preventDefault();
+    setMessage('');
+    
+    setLoading(true);
+
+    try {
+      await addDoc(collection(db, 'blog_posts'), {
+        title: editingSubmission.title,
+        content: editingSubmission.content,
+        category: editingSubmission.category,
+        author: editingSubmission.authorName,
+        authorBio: editingSubmission.authorBio,
+        image: editingSubmission.image || '',
+        status: 'published',
+        createdAt: serverTimestamp(),
+        excerpt: editingSubmission.summary,
+        readTime: editingReadTime, // Use the manually edited read time
+      });
+      
+      const submissionRef = doc(db, 'submissions', editingSubmission.id);
+      await updateDoc(submissionRef, { status: 'approved' });
+
+      setMessage('Post edited and published successfully!');
+      setEditingSubmission(null);
+      setEditingReadTime(''); // Reset the read time state
+      fetchSubmissions();
+    } catch (e) {
+      console.error('Error publishing edited document: ', e);
+      setMessage('Error publishing edited post. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditInputChange = (field, value) => {
+    setEditingSubmission(prev => ({ ...prev, [field]: value }));
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="flex h-screen items-center justify-center bg-muted/20">
@@ -174,6 +239,95 @@ const AdminDashboard = () => {
       </div>
     );
   }
+  
+  if (editingSubmission) {
+    return (
+      <div className="min-h-screen bg-muted/20">
+        <div className="container mx-auto px-6 py-12">
+          <Button variant="ghost" onClick={() => setEditingSubmission(null)} className="inline-flex items-center text-primary hover:text-primary/80 mb-6 transition-colors">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Exit Edit Mode
+          </Button>
+          <h1 className="text-4xl font-bold mb-8">Edit Submission</h1>
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Editing: {editingSubmission.title}</CardTitle>
+              <CardDescription>Make changes to the article before publishing.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handlePublishEdit} className="space-y-4">
+                <div>
+                  <label htmlFor="editTitle">Title</label>
+                  <Input 
+                    id="editTitle"
+                    type="text" 
+                    value={editingSubmission.title}
+                    onChange={(e) => handleEditInputChange('title', e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="editCategory">Category</label>
+                  <Input 
+                    id="editCategory"
+                    type="text" 
+                    value={editingSubmission.category}
+                    onChange={(e) => handleEditInputChange('category', e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="editAuthorName">Author Name</label>
+                  <Input
+                      id="editAuthorName"
+                      type="text"
+                      value={editingSubmission.authorName}
+                      onChange={(e) => handleEditInputChange('authorName', e.target.value)}
+                      className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="editAuthorBio">Author Bio</label>
+                  <Textarea
+                      id="editAuthorBio"
+                      rows={3}
+                      value={editingSubmission.authorBio}
+                      onChange={(e) => handleEditInputChange('authorBio', e.target.value)}
+                      className="mt-1"
+                  ></Textarea>
+                </div>
+                <div>
+                  <label htmlFor="editReadTime">Read Time (e.g., "5 min read")</label>
+                  <Input 
+                    id="editReadTime"
+                    type="text" 
+                    value={editingReadTime}
+                    onChange={(e) => setEditingReadTime(e.target.value)}
+                    placeholder="e.g., 5 min read"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="editContent">Content</label>
+                  <Textarea 
+                    id="editContent"
+                    rows={10}
+                    value={editingSubmission.content}
+                    onChange={(e) => handleEditInputChange('content', e.target.value)}
+                    className="min-h-[400px] mt-1"
+                  ></Textarea>
+                </div>
+                <Button type="submit" className="bg-green-500 text-white hover:bg-green-600" disabled={loading}>
+                  {loading ? 'Publishing...' : 'Publish Edited Post'}
+                </Button>
+                {message && <p className="text-sm italic mt-2">{message}</p>}
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted/20">
@@ -184,7 +338,6 @@ const AdminDashboard = () => {
         </Link>
         <h1 className="text-4xl font-bold mb-8">CMS Dashboard</h1>
         
-        {/* New Post Form */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Create a New Post</CardTitle>
@@ -215,6 +368,39 @@ const AdminDashboard = () => {
                 />
               </div>
               <div>
+                <label htmlFor="postAuthorName">Author Name</label>
+                <Input
+                    id="postAuthorName"
+                    type="text"
+                    value={newPostAuthorName}
+                    onChange={(e) => setNewPostAuthorName(e.target.value)}
+                    placeholder="e.g., Jane Doe"
+                    className="mt-1"
+                />
+              </div>
+              <div>
+                <label htmlFor="postAuthorBio">Author Bio (Optional)</label>
+                <Textarea
+                    id="postAuthorBio"
+                    rows={3}
+                    value={newPostAuthorBio}
+                    onChange={(e) => setNewPostAuthorBio(e.target.value)}
+                    placeholder="A brief bio about the author"
+                    className="mt-1"
+                ></Textarea>
+              </div>
+              <div>
+                <label htmlFor="postImage">Featured Image URL (Optional)</label>
+                <Input
+                    id="postImage"
+                    type="text"
+                    value={newPostImage}
+                    onChange={(e) => setNewPostImage(e.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                    className="mt-1"
+                />
+              </div>
+              <div>
                 <label htmlFor="postContent">Content</label>
                 <Textarea 
                   id="postContent"
@@ -225,15 +411,14 @@ const AdminDashboard = () => {
                   className="mt-1"
                 ></Textarea>
               </div>
-              <Button type="submit" className="bg-green-500 text-white hover:bg-green-600">
-                Publish Post
+              <Button type="submit" className="bg-green-500 text-white hover:bg-green-600" disabled={loading}>
+                {loading ? 'Publishing...' : 'Publish Post'}
               </Button>
               {message && <p className="text-sm italic mt-2">{message}</p>}
             </form>
           </CardContent>
         </Card>
 
-        {/* Pending Submissions */}
         <Card>
           <CardHeader>
             <CardTitle>Pending Submissions ({submissions.length})</CardTitle>
@@ -255,6 +440,10 @@ const AdminDashboard = () => {
                       <Button onClick={() => handleReject(submission.id)} variant="destructive">
                         <X className="h-4 w-4 mr-2" />
                         Reject
+                      </Button>
+                      <Button onClick={() => handleEdit(submission)} variant="secondary">
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
                       </Button>
                     </div>
                   </div>
