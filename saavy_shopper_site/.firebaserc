@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "saavy-shopper-app",
+    "saavy-shopper-site": "saavy-shopper-app"
+  },
+  "targets": {},
+  "etags": {}
+}
