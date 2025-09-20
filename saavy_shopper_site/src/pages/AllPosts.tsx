@@ -5,43 +5,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Calendar, Clock, ArrowRight, ArrowLeft, Search, Filter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
-// We import the necessary Firebase functions to interact with Firestore.
-import { db, collection, getDocs, query, where, orderBy, limit } from '../firebaseConfig';
+import { db, collection, getDocs } from '../firebaseConfig';
 import Footer from "../components/footer";
+import defaultImage from '../assets/shopping_cart.jpg'; // NEW: Import a default image
 
 const POSTS_PER_PAGE = 6;
 
-// I've added some hard-coded images and a map for now. A more robust solution might involve storing the image URL in Firestore.
-const imageMap = {
-  "Shopping Tips": "/src/assets/shopping_cart.jpg",
-  "Coupons": "/src/assets/logo.jpg",
-  "Budgeting": "/src/assets/shopping_cart.jpg",
-  "Apps & Technology": "/src/assets/logo.jpg",
-};
-
 const AllPosts = () => {
-
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  // We initialize the state to an empty array to hold our posts.
-  const [allBlogPosts, setAllBlogPosts] = useState([]);
-  // We use a loading state to show a message while data is being fetched.
-  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  
-  // This asynchronous function fetches posts from Firestore.
+  const [allBlogPosts, setAllBlogPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   const fetchPosts = async () => {
     setLoading(true);
     try {
-      // Create a query to get all documents from the "blog_posts" collection.
       const querySnapshot = await getDocs(collection(db, "blog_posts"));
-      // Map over the documents to format the data.
       const fetchedPosts = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        // Get the image from our hard-coded map based on the post's category.
-        image: imageMap[doc.data().category] || '/src/assets/logo.jpg',
-        // Convert the Firestore timestamp to a readable date string.
         date: new Date(doc.data().createdAt.seconds * 1000).toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'long',
@@ -55,18 +42,15 @@ const AllPosts = () => {
     setLoading(false);
   };
 
-  // The useEffect hook calls fetchPosts once when the component is first rendered.
   useEffect(() => {
     fetchPosts();
   }, []);
 
-  // useMemo is used to prevent unnecessary recalculations of categories.
   const categories = useMemo(() => {
     const uniqueCategories = new Set(allBlogPosts.map(post => post.category));
     return ["all", ...Array.from(uniqueCategories)];
   }, [allBlogPosts]);
 
-  // useMemo is used to filter posts based on search and category without re-rendering unnecessarily.
   const filteredPosts = useMemo(() => {
     return allBlogPosts.filter(post => {
       const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -84,7 +68,6 @@ const AllPosts = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header code... */}
       <div className="bg-gradient-to-r from-primary/5 via-primary/10 to-secondary/5 pt-20 pb-16">
         <div className="container mx-auto px-6">
           <div className="text-center">
@@ -101,6 +84,7 @@ const AllPosts = () => {
           </div>
         </div>
       </div>
+
       <div className="container mx-auto px-6 py-16">
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           <div className="relative flex-1">
@@ -138,7 +122,7 @@ const AllPosts = () => {
         </div>
         
         {loading ? (
-          <div className="col-span-full text-center py-12 text-muted-foreground">Loading posts...</div>
+          <div className="text-center py-12 text-muted-foreground">Loading posts...</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
             {currentPosts.length > 0 ? (
@@ -150,7 +134,7 @@ const AllPosts = () => {
                 >
                   <div className="relative overflow-hidden">
                     <img 
-                      src={post.image} 
+                      src={post.image || defaultImage} // UPDATED: Fallback image
                       alt={post.title}
                       className="w-full h-48 object-cover transition-transform duration-300 hover:scale-110"
                     />
@@ -211,7 +195,7 @@ const AllPosts = () => {
             )}
           </div>
         )}
-        
+
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-4">
             <Button 

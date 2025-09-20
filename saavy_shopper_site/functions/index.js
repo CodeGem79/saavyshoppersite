@@ -22,7 +22,7 @@ exports.sendSubmissionEmail = functions.firestore
 
     const mailOptions = {
       from: 'SaavyShopper Admin <no-reply@saavyshopper.com>',
-      to: 'nkyi.amands@gmail.com', // **CHANGE THIS TO YOUR EMAIL ADDRESS**
+      to: 'nkyi.amanda@gmail.com', // **CHANGE THIS TO YOUR EMAIL ADDRESS**
       subject: `New Article Submission from ${newSubmission.authorName}`,
       html: `
         <h2>New Article Submitted!</h2>

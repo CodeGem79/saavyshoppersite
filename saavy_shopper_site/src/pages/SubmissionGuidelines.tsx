@@ -3,8 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CheckCircle, Clock, FileText, Users, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import Footer from "../components/footer";
+import { useEffect } from "react";
 
 const SubmissionGuidelines = () => {
+  // NEW: Add a useEffect hook to scroll to the top on page load
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20">
       <div className="container mx-auto px-6 py-12">

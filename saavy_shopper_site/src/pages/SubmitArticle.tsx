@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,6 @@ import { ArrowLeft, Send, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import Footer from "../components/footer";
-// Import the necessary Firebase functions for adding documents
 import { db, collection, addDoc, serverTimestamp } from '../firebaseConfig';
 
 
@@ -30,12 +29,16 @@ const SubmitArticle = () => {
     allowEditing: false
   });
 
+  // NEW: Add a useEffect hook to scroll to the top on page load
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      // Add a document to the 'submissions' collection
       await addDoc(collection(db, 'submissions'), {
         ...formData,
         status: 'pending',
@@ -47,7 +50,6 @@ const SubmitArticle = () => {
         description: "We'll review your submission and get back to you within 5-7 business days.",
       });
 
-      // Reset form
       setFormData({
         title: "",
         category: "",
