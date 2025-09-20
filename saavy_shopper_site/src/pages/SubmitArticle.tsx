@@ -13,6 +13,7 @@ import Footer from "../components/footer";
 import { db, collection, addDoc, serverTimestamp } from '../firebaseConfig';
 
 
+
 const SubmitArticle = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
